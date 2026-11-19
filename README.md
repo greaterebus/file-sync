@@ -20,9 +20,9 @@ Requires macOS 14 Sonoma or newer. Python does not need to be installed.
 
 ## Installing
 
-1. Unzip `FileSync-macOS.zip`. Double-clicking it in Finder works.
-2. Drag **FileSync.app** into your **Applications** folder.
-3. Open it from Applications.
+1. Double-click `FileSync-macOS.dmg`. A window opens showing FileSync and an Applications folder.
+2. Drag **FileSync** onto **Applications**.
+3. Eject the "File Sync" disk in Finder's sidebar, then open FileSync from Applications.
 
 ### First launch and the macOS security warning
 
@@ -42,7 +42,8 @@ If your Mac's staging or Synology folder is in Documents, Desktop, Downloads, or
 external drive, macOS may also ask whether File Sync can access that folder. Click **Allow**.
 
 File Sync appears as a tray icon with an upward arrow in the menu bar at the top right of
-the screen. It does not appear in the Dock.
+the screen. It does not appear in the Dock. It stays there, using no CPU, until you click
+it, and closing its window does not quit it.
 
 ---
 
@@ -55,6 +56,10 @@ from the menu bar icon → **Settings…** or the **Settings…** button in the 
 
 - **Staging folder**: where scanners and recorders save new files.
 - **Synology folder**: the local folder that Synology Drive Client syncs.
+
+Leave **Open File Sync automatically when I log in** ticked so the menu bar icon is
+always there after restarting the Mac. You can untick it here later, or remove File Sync
+under **System Settings → General → Login Items**.
 
 Click **Choose…** next to each, then **Save**. File Sync checks that both folders exist,
 are different, are not inside each other, and are on the same disk. Moving files is
@@ -113,6 +118,8 @@ in the same folder.
 ### Quitting
 
 Menu bar icon → **Quit File Sync**. If a move is in progress, wait for it to finish first.
+To bring it back, open FileSync from Applications. If it opens at login, it also returns
+after the next restart.
 
 ### Notes
 
@@ -147,7 +154,7 @@ PYTHONPATH=src .venv/bin/python -m filesync
 .venv/bin/pytest
 ```
 
-### Build the distributable ZIP
+### Build the disk image
 
 Install Python 3.12 from python.org first: the **macOS 64-bit universal2 installer**
 from <https://www.python.org/downloads/macos/>. Then:
@@ -158,7 +165,8 @@ from <https://www.python.org/downloads/macos/>. Then:
 
 The script creates `.venv` from that Python, installs pinned dependencies, runs the
 tests, builds `dist/FileSync.app` with py2app, applies an ad-hoc code signature, and
-packages **`dist/FileSync-macOS.zip`** with `ditto`. Send the ZIP to users.
+packages **`dist/FileSync-macOS.dmg`**: a disk image with the app, an Applications
+shortcut, and a short "How to Install" note. Send the DMG to users.
 
 Why python.org Python: py2app copies the Python you build with into the app. The
 python.org build supports old macOS versions and both Intel and Apple Silicon. Homebrew's
@@ -167,5 +175,5 @@ bundled binaries and refuses to package an app that would not open on macOS 14. 
 build that only needs to run on your own Mac, use
 `ALLOW_HOST_ONLY_BUILD=1 PYTHON=/opt/homebrew/bin/python3.12 ./build.sh`.
 
-Not included by design: Developer ID signing, notarization, installers, DMGs, and
+Not included by design: Developer ID signing, notarization, installer packages, and
 automatic updates.

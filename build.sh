@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build dist/FileSync-macOS.zip: a standalone, ad-hoc signed FileSync.app.
+# Build dist/FileSync-macOS.dmg: a disk image containing a standalone, ad-hoc signed FileSync.app.
 #
 # Usage:  ./build.sh
 #
@@ -16,7 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="dist/FileSync.app"
-ZIP="dist/FileSync-macOS.zip"
+DMG="dist/FileSync-macOS.dmg"
 VENV=".venv"
 TARGET_MACOS="14.0"
 PYTHON_ORG="/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
@@ -61,8 +61,35 @@ step "Ad-hoc code signing"
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
-step "Packaging $ZIP"
-ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
+step "Packaging $DMG"
+# The disk image shows the app next to an Applications shortcut to drag it onto,
+# plus short instructions for the one-time macOS approval.
+contents="build/dmg"
+rm -rf "$contents"
+mkdir -p "$contents"
+ditto "$APP" "$contents/FileSync.app"
+ln -s /Applications "$contents/Applications"
+cat >"$contents/How to Install.txt" <<'EOF'
+Installing File Sync
+
+1. Drag FileSync onto the Applications folder in this window.
+2. Open FileSync from your Applications folder.
+3. macOS will say it cannot verify the app. Click Done.
+4. Open System Settings > Privacy & Security, scroll down, and click
+   "Open Anyway" next to FileSync. Confirm with Open Anyway (and your
+   password if asked).
+
+You only need to do this once. File Sync then appears as an icon in the
+menu bar at the top right of the screen. It does not appear in the Dock.
+
+5. Choose your staging and Synology folders and click Save. Leave
+   "Open File Sync automatically when I log in" ticked so the icon is
+   always there after restarting.
+
+You can eject this disk image afterwards.
+EOF
+hdiutil create -quiet -volname "File Sync" -srcfolder "$contents" -fs HFS+ -format UDZO -ov "$DMG"
+hdiutil verify -quiet "$DMG"
 
 printf '\nBuilt %s (%s, architectures: %s, requires macOS %s+)\n' \
-    "$ZIP" "$(du -h "$ZIP" | cut -f1)" "$(lipo -archs "$APP/Contents/MacOS/FileSync")" "$newest"
+    "$DMG" "$(du -h "$DMG" | cut -f1)" "$(lipo -archs "$APP/Contents/MacOS/FileSync")" "$newest"

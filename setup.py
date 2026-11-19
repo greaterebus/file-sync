@@ -10,12 +10,12 @@ from setuptools import setup
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))  # Lets py2app find the filesync package.
 
-from filesync import __version__  # noqa: E402
+from filesync import BUNDLE_ID, __version__  # noqa: E402
 
 PLIST = {
     "CFBundleName": "FileSync",
     "CFBundleDisplayName": "File Sync",
-    "CFBundleIdentifier": "local.filesync.FileSync",
+    "CFBundleIdentifier": BUNDLE_ID,
     "CFBundleShortVersionString": __version__,
     "CFBundleVersion": __version__,
     "LSMinimumSystemVersion": "14.0",

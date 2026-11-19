@@ -2,6 +2,7 @@
 rumps==0.4.0
 pyobjc-core==13.0
 pyobjc-framework-Cocoa==13.0
+pyobjc-framework-ServiceManagement==13.0
 
 # Build and test
 py2app==0.28.10

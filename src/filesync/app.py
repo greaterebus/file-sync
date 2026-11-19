@@ -20,6 +20,7 @@ from AppKit import (
     NSAlertFirstButtonReturn,
     NSAlertStyleInformational,
     NSAlertStyleWarning,
+    NSBundle,
     NSApplication,
     NSApplicationActivationPolicyAccessory,
     NSBackingStoreBuffered,
@@ -58,8 +59,9 @@ from AppKit import (
 )
 from Foundation import NSMakeRect, NSObject
 from PyObjCTools import AppHelper
+from ServiceManagement import SMAppService, SMAppServiceStatusEnabled, SMAppServiceStatusRequiresApproval
 
-from . import files, history
+from . import BUNDLE_ID, files, history
 from .files import FileRecord, Folders, MoveResult, Outcome, ScanResult, format_size, plural
 from .settings import Settings, load_settings, save_settings
 
@@ -307,6 +309,35 @@ def choose_folder(message: str, current: str) -> str | None:
     if panel.runModal() != NSModalResponseOK:
         return None
     return panel.URL().path()
+
+
+def login_item():
+    """This app's login item, or None when running from source (not as FileSync.app)."""
+    if NSBundle.mainBundle().bundleIdentifier() != BUNDLE_ID:
+        return None
+    return SMAppService.mainAppService()
+
+
+def opens_at_login() -> bool:
+    service = login_item()
+    return service is not None and service.status() == SMAppServiceStatusEnabled
+
+
+def set_open_at_login(enabled: bool) -> str:
+    """Add or remove File Sync from Login Items. Returns a problem to show, or ""."""
+    service = login_item()
+    if service is None:
+        return ""
+    if enabled:
+        succeeded, error = service.registerAndReturnError_(None)
+    else:
+        succeeded, error = service.unregisterAndReturnError_(None)
+    if not succeeded:
+        return f"Could not change the login setting: {error.localizedDescription() if error else 'unknown error'}"
+    if enabled and service.status() == SMAppServiceStatusRequiresApproval:
+        SMAppService.openSystemSettingsLoginItems()
+        return "Turn on File Sync under Login Items in System Settings to finish."
+    return ""
 
 
 # --------------------------------------------------------------------------
@@ -603,7 +634,7 @@ class SettingsWindow(NSObject):
 
     @objc.python_method
     def build(self) -> None:
-        width, height = 640.0, 270.0
+        width, height = 640.0, 300.0
         self.window = make_window("File Sync Settings", width, height, resizable=False)
         add_label(self.window, NSMakeRect(20, height - 40, width - 40, 20),
                   "Staging folder (where scanners and recorders save files):")
@@ -613,7 +644,12 @@ class SettingsWindow(NSObject):
                   "Synology folder (the local folder Synology Drive Client syncs):")
         self.destination_control = self.add_path_control(NSMakeRect(20, height - 140, width - 150, 24))
         add_button(self.window, NSMakeRect(width - 122, height - 144, 102, 32), "Choose…", self, "chooseDestination:")
-        self.message_label = add_label(self.window, NSMakeRect(20, 56, width - 40, 56), "", wraps=True)
+        self.login_checkbox = NSButton.checkboxWithTitle_target_action_(
+            "Open File Sync automatically when I log in", None, None
+        )
+        self.login_checkbox.setFrame_(NSMakeRect(18, 116, width - 40, 22))
+        self.window.contentView().addSubview_(self.login_checkbox)
+        self.message_label = add_label(self.window, NSMakeRect(20, 52, width - 40, 56), "", wraps=True)
         self.message_label.setTextColor_(NSColor.systemRedColor())
         add_button(self.window, NSMakeRect(width - 212, 12, 96, 32), "Cancel", self, "cancel:")
         save = add_button(self.window, NSMakeRect(width - 116, 12, 96, 32), "Save", self, "save:")
@@ -633,6 +669,7 @@ class SettingsWindow(NSObject):
         self.destination = self.owner.settings.destination
         self.message_label.setStringValue_("")
         self.update_controls()
+        self.update_login_checkbox()
         bring_to_front()
         self.window.makeKeyAndOrderFront_(None)
 
@@ -640,6 +677,16 @@ class SettingsWindow(NSObject):
     def update_controls(self) -> None:
         for control, path in ((self.source_control, self.source), (self.destination_control, self.destination)):
             control.setURL_(NSURL.fileURLWithPath_(path) if path else None)
+
+    @objc.python_method
+    def update_login_checkbox(self) -> None:
+        available = login_item() is not None
+        self.login_checkbox.setEnabled_(available)
+        # On first setup the box starts checked, so operators get it by default.
+        checked = available and (opens_at_login() or not self.owner.settings.is_complete)
+        self.login_checkbox.setState_(1 if checked else 0)
+        if not available:
+            self.login_checkbox.setTitle_("Open File Sync automatically when I log in (installed app only)")
 
     def chooseSource_(self, sender) -> None:
         chosen = choose_folder("Choose the staging folder where new scans and recordings are saved.", self.source)
@@ -669,8 +716,14 @@ class SettingsWindow(NSObject):
         except OSError as error:
             self.message_label.setStringValue_(f"Settings could not be saved: {error.strerror or error}")
             return
+        login_problem = ""
+        wants_login = bool(self.login_checkbox.state())
+        if self.login_checkbox.isEnabled() and wants_login != opens_at_login():
+            login_problem = set_open_at_login(wants_login)
         self.window.close()
         self.owner.apply_settings(new_settings)
+        if login_problem:
+            show_alert("Open at login", login_problem, warning=True)
 
 
 # --------------------------------------------------------------------------
