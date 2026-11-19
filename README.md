@@ -20,6 +20,10 @@ Requires macOS 14 Sonoma or newer. Python does not need to be installed.
 
 ## Installing
 
+Download the latest version:
+**[FileSync-macOS.dmg](https://github.com/greaterebus/file-sync/releases/latest/download/FileSync-macOS.dmg)**
+(all versions are on the [Releases page](https://github.com/greaterebus/file-sync/releases)).
+
 1. Double-click `FileSync-macOS.dmg`. A window opens showing FileSync and an Applications folder.
 2. Drag **FileSync** onto **Applications**.
 3. Eject the "File Sync" disk in Finder's sidebar, then open FileSync from Applications.
@@ -174,6 +178,19 @@ Python is compiled only for the macOS version it was installed on. `build.sh` ch
 bundled binaries and refuses to package an app that would not open on macOS 14. For a
 build that only needs to run on your own Mac, use
 `ALLOW_HOST_ONLY_BUILD=1 PYTHON=/opt/homebrew/bin/python3.12 ./build.sh`.
+
+### Release a new version
+
+GitHub Actions builds and publishes the disk image (`.github/workflows/release.yml`).
+
+1. Set `__version__` in `src/filesync/__init__.py` (for example `"1.0.1"`) and commit.
+2. Tag and push: `git tag v1.0.1 && git push origin main v1.0.1`.
+
+The workflow installs the python.org Python on a macOS runner, runs `./build.sh`, and
+attaches `FileSync-macOS.dmg` to a new GitHub Release. The download link above always
+points at the newest release. It refuses to run if the tag and `__version__` differ. To
+test a build without publishing, use **Run workflow** on the Actions tab; the disk image
+is attached to that run.
 
 Not included by design: Developer ID signing, notarization, installer packages, and
 automatic updates.

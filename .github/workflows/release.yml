@@ -1,0 +1,68 @@
+# Builds dist/FileSync-macOS.dmg and publishes it as a GitHub Release.
+#
+# - Push a tag like v1.0.1 (matching __version__ in src/filesync/__init__.py)
+#   to build and publish a release.
+# - Use "Run workflow" on the Actions tab to build without publishing; the
+#   disk image is attached to the workflow run instead.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Last Python 3.12 release with a python.org macOS installer. Its universal2
+  # build runs on macOS 10.13+, so the app works on macOS 14 on Intel and Apple Silicon.
+  PYTHON_VERSION: "3.12.10"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check tag matches app version
+        if: github.ref_type == 'tag'
+        run: |
+          app_version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/filesync/__init__.py)
+          if [[ "${GITHUB_REF_NAME#v}" != "$app_version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match __version__ = \"$app_version\" in src/filesync/__init__.py"
+            exit 1
+          fi
+
+      - name: Install python.org Python ${{ env.PYTHON_VERSION }} (universal2)
+        run: |
+          pkg="python-$PYTHON_VERSION-macos11.pkg"
+          curl -fsSLO "https://www.python.org/ftp/python/$PYTHON_VERSION/$pkg"
+          signature=$(pkgutil --check-signature "$pkg")
+          echo "$signature"
+          grep -q "Developer ID Installer: Python Software Foundation" <<<"$signature"
+          sudo installer -pkg "$pkg" -target /
+
+      - name: Build disk image
+        run: ./build.sh
+
+      - name: Attach disk image to workflow run
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileSync-macOS
+          path: dist/FileSync-macOS.dmg
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/FileSync-macOS.dmg --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/FileSync-macOS.dmg \
+              --title "File Sync ${GITHUB_REF_NAME#v}" \
+              --generate-notes \
+              --notes "Download **FileSync-macOS.dmg** below, open it, and follow *How to Install* inside. Requires macOS 14 or newer (Intel or Apple Silicon)."
+          fi
