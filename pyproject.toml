@@ -1,0 +1,6 @@
+# Runtime and build dependencies are pinned in requirements.txt.
+# (py2app refuses to build when [project].dependencies is declared here.)
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
