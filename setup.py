@@ -3,6 +3,7 @@
 Build with ./build.sh rather than running this directly.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -12,12 +13,15 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))  # Lets py2app find the f
 
 from filesync import BUNDLE_ID, __version__  # noqa: E402
 
+# macOS bundle versions must be numbers only: "1.0.0-beta.1" becomes "1.0.0".
+BUNDLE_VERSION = re.match(r"\d+(?:\.\d+)*", __version__).group()
+
 PLIST = {
     "CFBundleName": "FileSync",
     "CFBundleDisplayName": "File Sync",
     "CFBundleIdentifier": BUNDLE_ID,
-    "CFBundleShortVersionString": __version__,
-    "CFBundleVersion": __version__,
+    "CFBundleShortVersionString": BUNDLE_VERSION,
+    "CFBundleVersion": BUNDLE_VERSION,
     "LSMinimumSystemVersion": "14.0",
     "LSUIElement": True,  # Menu bar only: no Dock icon.
     "NSHumanReadableCopyright": "Moves finished scans and recordings into Synology Drive.",

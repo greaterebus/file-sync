@@ -1,7 +1,8 @@
 # Builds dist/FileSync-macOS.dmg and publishes it as a GitHub Release.
 #
 # - Push a tag like v1.0.1 (matching __version__ in src/filesync/__init__.py)
-#   to build and publish a release.
+#   to build and publish a release. Tags with a suffix, like v1.1.0-beta.1,
+#   are published as pre-releases.
 # - Use "Run workflow" on the Actions tab to build without publishing; the
 #   disk image is attached to the workflow run instead.
 name: Release
@@ -61,7 +62,9 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" dist/FileSync-macOS.dmg --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/FileSync-macOS.dmg \
+            prerelease=()
+            [[ "$GITHUB_REF_NAME" == *-* ]] && prerelease=(--prerelease)
+            gh release create "$GITHUB_REF_NAME" dist/FileSync-macOS.dmg "${prerelease[@]}" \
               --title "File Sync ${GITHUB_REF_NAME#v}" \
               --generate-notes \
               --notes "Download **FileSync-macOS.dmg** below, open it, and follow *How to Install* inside. Requires macOS 14 or newer (Intel or Apple Silicon)."
